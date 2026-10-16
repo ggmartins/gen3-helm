@@ -14,7 +14,7 @@
 {{- $costTagKey := $costTag.key | default "KubernetesNamespace" }}
 {{- $costTagValue := $costTag.value | default $namespace }}
 ---
-{{- if semverCompare ">=1.0.8" $.Values.karpenter.targetRevision }}
+{{- if semverCompare ">=1.0.8-0" $.Values.karpenter.targetRevision }}
 apiVersion: karpenter.k8s.aws/v1
 {{- else }}
 apiVersion: karpenter.k8s.aws/v1beta1
@@ -23,7 +23,7 @@ kind: EC2NodeClass
 metadata:
   name: {{ $poolName }}
 spec:
-  {{- if semverCompare ">=1.33" $.Capabilities.KubeVersion.Version }}
+  {{- if semverCompare ">=1.33.0-0" $.Capabilities.KubeVersion.Version }}
   amiFamily: AL2023
   {{- else }}
   amiFamily: AL2
@@ -42,7 +42,7 @@ spec:
       encrypted: true
       volumeSize: {{ index $.Values "karpenter-crds" "workflow" "volumeSize" }}
       volumeType: gp3
-{{ if and (semverCompare ">=1.33" $.Capabilities.KubeVersion.Version) (index $.Values "karpenter-crds" "workflow" "fastImagePull" "enabled") }}
+{{ if and (semverCompare ">=1.33.0-0" $.Capabilities.KubeVersion.Version) (index $.Values "karpenter-crds" "workflow" "fastImagePull" "enabled") }}
       iops: {{ index $.Values "karpenter-crds" "workflow" "fastImagePull" "iops" }}
       throughput: {{ index $.Values "karpenter-crds" "workflow" "fastImagePull" "throughput" }}
 {{ end }}
@@ -95,7 +95,7 @@ spec:
     sysctl -w fs.inotify.max_user_watches=12000 &
     systemctl stop firewalld
     systemctl disable firewalld
-{{ if and (semverCompare ">=1.33" $.Capabilities.KubeVersion.Version) (index $.Values "karpenter-crds" "workflow" "fastImagePull" "enabled") }}
+{{ if and (semverCompare ">=1.33.0-0" $.Capabilities.KubeVersion.Version) (index $.Values "karpenter-crds" "workflow" "fastImagePull" "enabled") }}
 
     --BOUNDARY
     Content-Type: application/node.eks.aws
@@ -110,7 +110,7 @@ spec:
 
     --BOUNDARY--
 
-{{- if semverCompare ">=1.0.8" $.Values.karpenter.targetRevision }}
+{{- if semverCompare ">=1.0.8-0" $.Values.karpenter.targetRevision }}
   kubelet:
     evictionHard:
       memory.available: 5%
@@ -120,7 +120,7 @@ spec:
       memory.available: 5m
 {{- end }}
 ---
-{{- if semverCompare ">=1.0.8" $.Values.karpenter.targetRevision }}
+{{- if semverCompare ">=1.0.8-0" $.Values.karpenter.targetRevision }}
 apiVersion: karpenter.sh/v1
 kind: NodePool
 metadata:
