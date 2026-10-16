@@ -1,0 +1,260 @@
+#helm template cluster-resources ./helm/cluster-level-resources \
+#  --kube-version 1.33.0 \
+#  --set-string cluster=my-eks-cluster \
+#  --set karpenter-crds.enabled=true \
+#  --set karpenter-crds.workflow.enabled=true \
+#  --set-string karpenter-crds.selectorTag=my-eks-cluster \
+#  --set-string 'karpenter-crds.workflow.additionalTags.CostCenter=research' \
+#  --set-string 'karpenter-crds.workflow.pools[0].namespace=research-a' \
+#  --set-string 'karpenter-crds.workflow.pools[0].costTag.key=KubernetesNamespace' \
+#  --set-string 'karpenter-crds.workflow.pools[0].costTag.value=research-a' \
+#  --set-string 'karpenter-crds.workflow.pools[1].namespace=research-b' \
+#  --set-string 'karpenter-crds.workflow.pools[1].costTag.key=KubernetesNamespace' \
+#  --set-string 'karpenter-crds.workflow.pools[1].costTag.value=research-b' \
+#  --show-only templates/karpenter-config-resources-workflow.yaml \
+#  > /tmp/karpenter-config-resources-workflow-pools.render.yaml
+
+---
+# Source: cluster-level-resources/templates/karpenter-config-resources-workflow.yaml
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: workflow-research-a
+spec:
+  amiFamily: AL2023
+  amiSelectorTerms:
+  - name: EKS-FIPS*
+    owner: "143731057154"
+  blockDeviceMappings:
+  - deviceName: /dev/xvda
+    ebs:
+      deleteOnTermination: true
+      encrypted: true
+      volumeSize: 50Gi
+      volumeType: gp3
+
+  metadataOptions:
+    httpEndpoint: enabled
+    httpProtocolIPv6: disabled
+    httpPutResponseHopLimit: 2
+    httpTokens: optional
+  role: eks_my-eks-cluster_workers_role
+
+  securityGroupSelectorTerms:
+  - tags:
+      karpenter.sh/discovery: my-eks-cluster
+
+  subnetSelectorTerms:
+  - tags:
+     karpenter.sh/discovery: my-eks-cluster
+  tags:
+    "CostCenter": "research"
+    "Environment": "my-eks-cluster"
+    "KubernetesNamespace": "research-a"
+    "Name": "eks-my-eks-cluster-workflow-research-a"
+    "karpenter.sh/discovery": "my-eks-cluster"
+    "purpose": "workflow"
+
+  userData: |
+    MIME-Version: 1.0
+    Content-Type: multipart/mixed; boundary="BOUNDARY"
+
+    --BOUNDARY
+    Content-Type: text/x-shellscript; charset="us-ascii"
+
+    #!/bin/bash -x
+    echo "$(jq '.registryPullQPS=0' /etc/kubernetes/kubelet/kubelet-config.json)" > /etc/kubernetes/kubelet/kubelet-config.json
+    curl https://raw.githubusercontent.com/uc-cdis/cloud-automation/master/files/authorized_keys/ops_team >> /home/ec2-user/.ssh/authorized_keys &
+    sysctl -w fs.inotify.max_user_watches=12000 &
+    systemctl stop firewalld
+    systemctl disable firewalld
+
+
+    --BOUNDARY--
+  kubelet:
+    evictionHard:
+      memory.available: 5%
+    evictionSoft:
+      memory.available: 10%
+    evictionSoftGracePeriod:
+      memory.available: 5m
+
+
+---
+# Source: cluster-level-resources/templates/karpenter-config-resources-workflow.yaml
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: workflow-research-b
+spec:
+  amiFamily: AL2023
+  amiSelectorTerms:
+  - name: EKS-FIPS*
+    owner: "143731057154"
+  blockDeviceMappings:
+  - deviceName: /dev/xvda
+    ebs:
+      deleteOnTermination: true
+      encrypted: true
+      volumeSize: 50Gi
+      volumeType: gp3
+
+  metadataOptions:
+    httpEndpoint: enabled
+    httpProtocolIPv6: disabled
+    httpPutResponseHopLimit: 2
+    httpTokens: optional
+  role: eks_my-eks-cluster_workers_role
+
+  securityGroupSelectorTerms:
+  - tags:
+      karpenter.sh/discovery: my-eks-cluster
+
+  subnetSelectorTerms:
+  - tags:
+     karpenter.sh/discovery: my-eks-cluster
+  tags:
+    "CostCenter": "research"
+    "Environment": "my-eks-cluster"
+    "KubernetesNamespace": "research-b"
+    "Name": "eks-my-eks-cluster-workflow-research-b"
+    "karpenter.sh/discovery": "my-eks-cluster"
+    "purpose": "workflow"
+
+  userData: |
+    MIME-Version: 1.0
+    Content-Type: multipart/mixed; boundary="BOUNDARY"
+
+    --BOUNDARY
+    Content-Type: text/x-shellscript; charset="us-ascii"
+
+    #!/bin/bash -x
+    echo "$(jq '.registryPullQPS=0' /etc/kubernetes/kubelet/kubelet-config.json)" > /etc/kubernetes/kubelet/kubelet-config.json
+    curl https://raw.githubusercontent.com/uc-cdis/cloud-automation/master/files/authorized_keys/ops_team >> /home/ec2-user/.ssh/authorized_keys &
+    sysctl -w fs.inotify.max_user_watches=12000 &
+    systemctl stop firewalld
+    systemctl disable firewalld
+
+
+    --BOUNDARY--
+  kubelet:
+    evictionHard:
+      memory.available: 5%
+    evictionSoft:
+      memory.available: 10%
+    evictionSoftGracePeriod:
+      memory.available: 5m
+
+
+---
+# Source: cluster-level-resources/templates/karpenter-config-resources-workflow.yaml
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: workflow-research-a
+spec:
+  template:
+    metadata:
+      labels:
+        role: workflow
+        billing.gen3.org/namespace: "research-a"
+    spec:
+      taints:
+      - effect: NoSchedule
+        key: role
+        value: workflow
+      - effect: NoSchedule
+        key: billing.gen3.org/namespace
+        value: "research-a"
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: workflow-research-a
+      expireAfter: 168h
+      terminationGracePeriod: 48h
+      requirements:
+      
+      - key: karpenter.sh/capacity-type
+        operator: In
+        values:
+        - on-demand
+      - key: kubernetes.io/arch
+        operator: In
+        values:
+        - amd64
+      - key: karpenter.k8s.aws/instance-category
+        operator: In
+        values:
+        - c
+        - m
+        - r
+        - t
+
+
+  disruption:
+    consolidateAfter: 30s
+    consolidationPolicy: WhenEmpty
+    budgets:
+    - nodes: 10%
+
+  limits:
+    cpu: "1000"
+    memory: 1000Gi
+
+
+
+---
+# Source: cluster-level-resources/templates/karpenter-config-resources-workflow.yaml
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: workflow-research-b
+spec:
+  template:
+    metadata:
+      labels:
+        role: workflow
+        billing.gen3.org/namespace: "research-b"
+    spec:
+      taints:
+      - effect: NoSchedule
+        key: role
+        value: workflow
+      - effect: NoSchedule
+        key: billing.gen3.org/namespace
+        value: "research-b"
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: workflow-research-b
+      expireAfter: 168h
+      terminationGracePeriod: 48h
+      requirements:
+      
+      - key: karpenter.sh/capacity-type
+        operator: In
+        values:
+        - on-demand
+      - key: kubernetes.io/arch
+        operator: In
+        values:
+        - amd64
+      - key: karpenter.k8s.aws/instance-category
+        operator: In
+        values:
+        - c
+        - m
+        - r
+        - t
+
+
+  disruption:
+    consolidateAfter: 30s
+    consolidationPolicy: WhenEmpty
+    budgets:
+    - nodes: 10%
+
+  limits:
+    cpu: "1000"
+    memory: 1000Gi
+
